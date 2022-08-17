@@ -14,19 +14,13 @@ extern "C"
 }
 #include <precondition_x_pub.hpp>
 
-class cc_appl_x_itf {
-public:
-	virtual ~cc_appl_x_itf() {}
-public:
-	virtual void Net_ComCtrl_Switch_Rx_PDU(bool RX_Enable) = 0;
-	virtual void Net_ComCtrl_Switch_Tx_PDU(bool RX_Enable) = 0;
 
-};
-
-class Cmocks :public cc_appl_x_itf {
+class Cmocks {
 public:
-	MOCK_METHOD1(Net_ComCtrl_Switch_Rx_PDU, void(bool));
-	MOCK_METHOD1(Net_ComCtrl_Switch_Tx_PDU, void(bool));
+	Cmocks();
+	~Cmocks();
+	MOCK_METHOD1(Net_ComCtrl_Switch_RX_PDU, void(bool));
+	MOCK_METHOD1(Net_ComCtrl_Switch_TX_PDU, void(bool));
 
 };
 
