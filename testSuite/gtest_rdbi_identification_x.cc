@@ -25,6 +25,8 @@ extern "C"
 #include <daddy_senderport.hpp>
 #include <dia_runnableUser_cust.hpp>
 
+#include "net_sim.hpp"
+
 using namespace testing;
 using namespace dia;
 
@@ -45,11 +47,102 @@ NvM_Bldr_BootSoftwareIdentificationNumber_t Dia_HardwareIdentificationNumber;
 uint8 Dia_VehicleType_uint8;
 
 
-//////////////////////卡车工程写法///////////////////////////
+/*****************************************************************************/
+/* Abstract class implementation declaration                                 */
+/*****************************************************************************/
+namespace daddy
+{
+namespace receiver
+{
+namespace interface
+{
+    class imp_test_dia_runnableUser_cust_CBase : public CBase
+    {
+    public:
+        bool assign(const daddy::receiver::interface::CBase::PortDataBase_t * const, const daddy::receiver::interface::CBase::PortDataBase_t *&);
+        bool isConnected() const;
+        bool isReleased(const daddy::receiver::interface::CBase::PortDataBase_t *&);
+        void connect();
+        void disconnect();
+    };
+}
+}
+}
+
+namespace daddy
+{
+namespace mempool
+{
+    class imp_test_dia_runnableUser_cust_CConstMemPoolBase : public CConstMemPoolBase
+    {
+    public:
+        const void * getChunk() const;
+    };
+}
+}
+
+namespace net 
+{
+    class imp_test_dia_runnableUser_cust_CRbNetComMonitorBase : public CRbNetComMonitorBase
+    {
+    public:
+        void update(uint16);
+    };
+}
+
+namespace daddy
+{
+namespace runnable
+{
+    class imp_test_dia_runnableUser_cust_CRunnableBase : public CRunnableBase
+    {
+    public:
+        void init();
+        void run();
+    };
+}
+}
+
+
+namespace daddy
+{
+namespace adapter
+{
+    void MeasureDeliveredData(
+        const void*       currentModifiedChunk,
+        const void* const currentMempoolPtr,
+        vfc::uint32_t     mempoolSize,
+        vfc::uint32_t     measurementId )
+    {
+        vfc::nop(currentModifiedChunk);
+        vfc::nop(currentMempoolPtr);
+        vfc::nop(mempoolSize);
+        vfc::nop(measurementId);
+    }
+}
+}
+
+
+/* Global Functions */
+namespace daddy
+{
+namespace adapter
+{
+    void handleError(daddy::EErrorIDs ErrorID, const void * currentThis, daddy::EModuleIDs ModuleID, daddy::EApiIDs ApiID);
+}
+}
+
+
+extern "C" uint32 rbMcu_SetLock_u32(uint32* p_LockVar_pu32, uint32 p_LockPattern_u32);
+extern "C" void   rbMcu_ReleaseLock(uint32* p_LockVar_pu32);
+extern "C" void   rbMcu_RequestSpinLock_u32(uint32* p_LockVar_pu32, uint32 p_LockPattern_u32);
+extern "C" void   rbMcu_ReleaseSpinLock_u32(uint32* p_LockVar_pu32);
+
+extern "C" Std_ReturnType Det_ReportRuntimeError(uint16 ModuleId, uint8 InstanceId, uint8 ApiId, uint8 ErrorId);
 
 namespace dia
 {
-    CDiaRunnableCust* g_diaRunnableCust_p ;// = &dia_CDiarunnableCust_obj;
+    CDiaRunnableCust* g_diaRunnableCust_p;
 	CDiaRunnableCust dia_CDiarunnableCust_obj;
 }
 
@@ -79,20 +172,13 @@ void rbDia::CDiaRunnable::cleanupPorts(){}
 
 class diaRunnableCustTest : public Test
 {
-public:
-	daddy::TSenderPort<net::CNetTx_GAC_MRR_1> m_dummy_MRR_1_out;
-    daddy::TMemPool<net::CNetTx_GAC_MRR_1,10> m_dummy_MRR_1_Mempool{};
-    net::CNetTx_GAC_MRR_1*                    m_MRR_1{};	// Why define this?
 
 public:
 	virtual void SetUp() override
 	{
-		m_dummy_MRR_1_out.connectMemPool(m_dummy_MRR_1_Mempool);
-		m_dummy_MRR_1_out.connect(g_diaRunnableCust_p->m_MRR_1_in);
 	}
 	virtual void TearDown() override
 	{
-		m_dummy_MRR_1_out.disconnect(g_diaRunnableCust_p->m_MRR_1_in);
 	}
 };
 
@@ -102,5 +188,97 @@ TEST_F(diaRunnableCustTest, FCWSystemStatus_ReadData_1)
 	Std_ReturnType returnval = E_OK;
     returnval = FCWSystemStatus_ReadData(p_Data_pub);
 	EXPECT_EQ(returnval, E_OK);
+
+	TEST::Port_Config_ITF();
+	dia::CDiaRunnableCust testObj;
+	dia::g_diaRunnableCust_p = &testObj;
+	// Config port for using netsim
+	TEST::Port_Config(testObj);
+	net::CNetTx_GAC_MRR_1 m_MRR_1_indata;
+	m_MRR_1_indata.setMRR_FCWFaultSt(1);
+	SETDATA(TEST::m_MRR_1_in, portData = m_MRR_1_indata;);
+	returnval = FCWSystemStatus_ReadData(p_Data_pub);
+	EXPECT_EQ(p_Data_pub[0], 1);
+	EXPECT_EQ(returnval, E_OK);
+	TEST::Port_DisConfig(testObj);
 }
 
+
+/* Stub for function daddy::adapter::handleError */
+namespace daddy 
+{
+namespace adapter
+{
+    void handleError(daddy::EErrorIDs ErrorID, const void * currentThis, daddy::EModuleIDs ModuleID, daddy::EApiIDs ApiID)
+    {
+        // REGISTER_CALL("daddy::adapter::handleError(daddy::EErrorIDs, const void *, daddy::EModuleIDs, daddy::EApiIDs)");
+
+        // IF_INSTANCE("default") {
+        //     return;
+        // }
+
+        // LOG_SCRIPT_ERROR("Call instance not defined.");
+        return;
+    }
+}
+}
+
+
+extern "C" uint32 rbMcu_SetLock_u32(uint32* m_value, uint32 value)
+{
+    if (daddy::adapter::AtomicValue::VALUE_UNSET == value)
+    {
+        value = 1;
+    }
+
+    uint32 ret = *m_value;
+    *m_value   = value;
+
+    return ret;
+}
+
+extern "C" void rbMcu_ReleaseLock(uint32* m_value)
+{
+    *m_value = daddy::adapter::AtomicValue::VALUE_UNSET;
+}
+
+
+/* Stub for function rbMcu_RequestSpinLock_u32 */
+extern "C" void rbMcu_RequestSpinLock_u32(uint32* p_LockVar_pu32, uint32 p_LockPattern_u32)
+{
+//    REGISTER_CALL("rbMcu_RequestSpinLock_u32(uint32 *, uint32)");
+
+//    IF_INSTANCE("default")
+//    {
+//       return;
+//    }
+
+//    LOG_SCRIPT_ERROR("Call instance not defined.");
+}
+
+/* Stub for function rbMcu_ReleaseSpinLock_u32 */
+extern "C" void rbMcu_ReleaseSpinLock_u32(uint32* p_LockVar_pu32)
+{
+//    REGISTER_CALL("rbMcu_ReleaseSpinLock_u32(uint32 *)");
+
+//    IF_INSTANCE("default")
+//    {
+//       return;
+//    }
+
+//    LOG_SCRIPT_ERROR("Call instance not defined.");
+}
+
+
+/* Stub for function Det_ReportRuntimeError */
+extern "C" Std_ReturnType Det_ReportRuntimeError(uint16 ModuleId, uint8 InstanceId, uint8 ApiId, uint8 ErrorId)
+{
+    // REGISTER_CALL("Det_ReportRuntimeError(uint16, uint8, uint8, uint8)");
+
+    // IF_INSTANCE("default") {
+    //     return CANTATA_DEFAULT_VALUE;
+    // }
+
+    // LOG_SCRIPT_ERROR("Call instance not defined.");
+    return 0;
+}
